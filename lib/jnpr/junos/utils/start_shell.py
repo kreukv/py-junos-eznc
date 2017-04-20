@@ -82,6 +82,7 @@ class StartShell(object):
         drop into the Junos shell (csh).  This process opens a
         :class:`paramiko.SSHClient` instance.
         """
+        """
         junos = self._nc
 
         client = paramiko.SSHClient()
@@ -92,6 +93,39 @@ class StartShell(object):
                        username=junos._auth_user,
                        password=junos._auth_password,
                        )
+        """
+# begin fix 
+        junos = self._nc
+
+        client = paramiko.SSHClient()
+        client.load_system_host_keys()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        # use junos._hostname since this will be correct if we are going
+        # through a jumphost.
+
+        config = {}
+
+        ssh_config = getattr(junos, '_sshconf_path')
+        if ssh_config:
+            config = paramiko.SSHConfig()
+            config.parse(open(ssh_config))
+            config = config.lookup(junos._hostname)
+        sock = None
+
+        if config.get("proxycommand"):
+            sock = paramiko.proxy.ProxyCommand(config.get("proxycommand"))
+
+        client.connect(hostname=junos._hostname,
+                          port=(
+                              22, int(
+                                  junos._port))[
+                              junos._hostname == 'localhost'],
+                          username=junos._auth_user,
+                          password=junos._auth_password,
+                          sock=sock
+                          )
+# end fix
 
         chan = client.invoke_shell()
         self._client = client
